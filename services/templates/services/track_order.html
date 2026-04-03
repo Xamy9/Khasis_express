@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Track Order</title>
+</head>
+<body>
+
+<h2>Track Your Order</h2>
+
+<form method="GET">
+    <input type="text" name="tracking_id" placeholder="Enter Tracking ID">
+    <button type="submit">Track</button>
+</form>
+
+{% if order %}
+    <h3>Order Details</h3>
+    <p><strong>Tracking ID:</strong> {{ order.tracking_id }}</p>
+    <p><strong>Service:</strong> {{ order.service_type }}</p>
+    <p><strong>Status:</strong> {{ order.status }}</p>
+    <p><strong>Price:</strong> {{ order.price }}</p>
+{% elif tracking_id %}
+    <p>Order not found.</p>
+{% endif %}
+
+</body>
+</html>

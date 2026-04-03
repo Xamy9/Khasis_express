@@ -1,0 +1,15 @@
+<h2>Delivery Summary</h2>
+
+<p>Pickup: {{ pickup }}</p>
+<p>Destination: {{ destination }}</p>
+<p>Distance: {{ distance }} km</p>
+<p>Price: ₦{{ price }}</p>
+
+<form method="POST" action="{% url 'create_request' service_type %}">
+    {% csrf_token %}
+
+    <input type="hidden" name="pickup_location" value="{{ pickup }}">
+    <input type="hidden" name="destination" value="{{ destination }}">
+
+    <button type="submit">Confirm Delivery</button>
+</form>

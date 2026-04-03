@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ service_type|title }} Request</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+<div class="container mt-5">
+<div class="card shadow p-4 mx-auto" style="max-width:500px;">
+
+<h3 class="mb-3 text-center">{{ service_type|title }} Request</h3>
+
+<form method="POST">
+{% csrf_token %}
+
+<div class="mb-3">
+<label>Pickup Address</label>
+{{ form.pickup_location }}
+</div>
+
+<div class="mb-3">
+<label>Destination Address</label>
+{{ form.destination }}
+</div>
+
+<div class="mb-3">
+<label>Sender Phone</label>
+{{ form.sender_phone_number }}
+</div>
+
+<div class="mb-3">
+<label>Receiver Name</label>
+{{ form.receiver_name }}
+</div>
+
+<div class="mb-3">
+<label>Receiver Phone</label>
+{{ form.receiver_phone_number}}
+</div>
+
+<div class="mb-3">
+<label>Package Description</label>
+{{ form.package_description }}
+</div>
+
+<div class="mb-3">
+<label>Estimated Weight (kg)</label>
+{{ form.weight }}
+</div>
+
+<div class="mb-3">
+<label>Distance (km)</label>
+<input type="text" id="distance" class="form-control" readonly>
+</div>
+
+<div class="mb-3">
+<label>Price (₦)</label>
+<input type="text" id="price" class="form-control" readonly>
+</div>
+
+<button type="button" class="btn btn-info w-100 mb-2" id="calculate-btn">Calculate Price</button>
+<button type="submit" class="btn btn-primary w-100">Submit Request</button>
+
+</form>
+<a href="/" class="btn btn-secondary w-100 mt-3">Back Home</a>
+
+</div>
+</div>
+
+<script>
+document.getElementById("calculate-btn").addEventListener("click", function(){
+
+    let pickup = document.getElementById("id_pickup_location").value;
+    let destination = document.getElementById("id_destination").value;
+    let weight = document.getElementById("id_weight").value || 0; // default 0 if empty
+    let serviceType = "{{ service_type }}";
+
+    if(pickup === "" || destination === "") {
+        alert("Enter pickup and destination");
+        return;
+    }
+
+    fetch(`/preview-price/?pickup=${encodeURIComponent(pickup)}
+        &destination=${encodeURIComponent(destination)}
+        &service_type=${serviceType}
+        &weight=${weight}`)
+    .then(response => response.json())
+    .then(data => {
+        if(data.error) {
+            alert(data.error);
+        } else {
+            document.getElementById("distance").value = data.distance.toFixed(2) + " km";
+            document.getElementById("price").value = "₦ " + data.price.toFixed(2);
+        }
+    })
+    .catch(error => {
+        console.log(error);
+        alert("Error calculating price");
+    });
+
+});
+</script>
+
+</body>
+</html>
