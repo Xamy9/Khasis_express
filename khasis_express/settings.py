@@ -41,8 +41,8 @@ SESSION_COOKIE_SECURE = True
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-#DEBUG = os.getenv("DEBUG") == "True"
-DEBUG=True
+DEBUG = os.getenv("DEBUG") == "True"
+
 ALLOWED_HOSTS = ["127.0.0.1","localhost", ".onrender.com"]
 
 CSRF_TRUSTED_ORIGINS = ["https://*.onrender.com"]
