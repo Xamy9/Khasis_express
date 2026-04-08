@@ -1,20 +1,14 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from .forms import ServiceRequestForm,BusinessImageForm
-from .models import ServiceRequest,BusinessImage
+from .forms import ServiceRequestForm, BusinessImageForm, ContactForm
+from .models import ServiceRequest, BusinessImage, LandingPage
 from .utils import calculate_price, calculate_distance
 from notifications.models import Notification
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.conf import settings
-from django.shortcuts import render
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
-from .forms import ContactForm
-from .models import LandingPage
-
-
-
 
 
 def about(request):
@@ -54,19 +48,34 @@ def create_request(request, service_type):
 
             service_request.distance_km = distance
 
-            # 🔥 CALCULATE PRICE WITH WEIGHT
-            service_request.price = calculate_price(
-                service_type,
-                distance,
-                weight
-            )
+            # CALCULATE PRICE
+            try:
+                service_request.price = calculate_price(
+                    service_type,
+                    distance,
+                    weight
+                )
+            except Exception as e:
+                print("Price calculation error:", e)
+                service_request.price = 0
 
-            service_request.save()
+            # SAVE ORDER
+            try:
+                service_request.save()
+            except Exception as e:
+                print("Save error:", e)
+                return render(request, "services/create_request.html", {
+                    "form": form,
+                    "service_type": service_type,
+                    "error": "Failed to save request"
+                })
 
-            # SEND EMAIL
-            send_mail(
-                subject="New Delivery Request - KHASIS EXPRESS",
-                message=f"""
+            # SEND EMAIL (SAFE)
+            try:
+                if getattr(settings, "ADMIN_EMAIL", None):
+                    send_mail(
+                        subject="New Delivery Request - KHASIS EXPRESS",
+                        message=f"""
 A new {service_type} request has been placed.
 
 Customer: {request.user.username}
@@ -81,21 +90,27 @@ Distance: {service_request.distance_km} km
 Price: {service_request.price}
 
 Tracking ID: {service_request.tracking_id}
-                """,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.ADMIN_EMAIL],
-                fail_silently=False,
-            )
+                        """,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[settings.ADMIN_EMAIL],
+                        fail_silently=True,
+                    )
+            except Exception as e:
+                print("Email error:", e)
 
-            # ADMIN NOTIFICATION
-            admin_user = User.objects.filter(is_superuser=True).first()
-            if admin_user:
-                Notification.objects.create(
-                    user=admin_user,
-                    message=f"{service_type} request from {request.user.username} ({service_request.tracking_id})"
-                )
+            # ADMIN NOTIFICATION (SAFE)
+            try:
+                admin_user = User.objects.filter(is_superuser=True).first()
+                if admin_user:
+                    Notification.objects.create(
+                        user=admin_user,
+                        message=f"{service_type} request from {request.user.username} ({service_request.tracking_id})"
+                    )
+            except Exception as e:
+                print("Notification error:", e)
 
             return redirect("home")
+
     else:
         form = ServiceRequestForm()
 
@@ -106,22 +121,19 @@ Tracking ID: {service_request.tracking_id}
     )
 
 
-
 @login_required
 def dashboard(request):
-    # SHOW ONLY ORDERS PLACED BY LOGGED-IN USER
     requests = ServiceRequest.objects.filter(user=request.user).order_by("-created_at")
     return render(request, "services/dashboard.html", {"requests": requests})
+
 
 @login_required
 def track_order(request):
     tracking_id = request.GET.get("tracking_id")
-    # USE get_object_or_404 TO HANDLE INVALID TRACKING ID
     order = None
     if tracking_id:
         order = ServiceRequest.objects.filter(tracking_id=tracking_id).first()
     return render(request, "services/track_order.html", {"order": order})
-
 
 
 def preview_price(request):
@@ -140,7 +152,6 @@ def preview_price(request):
     except (ValueError, TypeError):
         weight = 0
 
-    # Calculate distance
     try:
         distance = calculate_distance(pickup, destination)
         if distance is None:
@@ -149,33 +160,31 @@ def preview_price(request):
         print("Preview distance error:", e)
         distance = 0
 
-    # Calculate price including weight
     price = calculate_price(service_type, distance, weight)
 
     return JsonResponse({
         "distance": round(distance, 2),
         "price": round(price, 2)
     })
-    
-    
-    
-    
-    
-    
+
+
 def contact_us(request):
     if request.method == "POST":
         form = ContactForm(request.POST)
         if form.is_valid():
             contact_message = form.save()
 
-            # Optional: send an email notification
-            send_mail(
-                subject=f"New Contact Message: {contact_message.subject}",
-                message=f"From: {contact_message.name} <{contact_message.email}>\n\n{contact_message.message}",
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.ADMIN_EMAIL],
-                fail_silently=True
-            )
+            try:
+                if getattr(settings, "ADMIN_EMAIL", None):
+                    send_mail(
+                        subject=f"New Contact Message: {contact_message.subject}",
+                        message=f"From: {contact_message.name} <{contact_message.email}>\n\n{contact_message.message}",
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[settings.ADMIN_EMAIL],
+                        fail_silently=True
+                    )
+            except Exception as e:
+                print("Contact email error:", e)
 
             return render(request, "services/contact_success.html", {"contact_message": contact_message})
     else:
@@ -184,19 +193,13 @@ def contact_us(request):
     return render(request, "services/contact_us.html", {"form": form})
 
 
-
-
-
-
-#from .models import LandingPage
-
 def landing(request):
-    # 🔐 Skip landing if already logged in
     if request.user.is_authenticated:
-        return redirect("home")  # or "dashboard"
+        return redirect("home")
 
-    # 🖼 Get landing content from admin
-    landing = LandingPage.objects.first()
+    landing = LandingPage.objects.filter(
+        background_image__isnull=False
+    ).first()
 
     return render(request, "services/landing.html", {
         "landing": landing
