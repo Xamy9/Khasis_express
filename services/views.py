@@ -109,8 +109,14 @@ Tracking ID: {service_request.tracking_id}
             except Exception as e:
                 print("Notification error:", e)
 
-            return redirect("home")
-
+            return render(request, "services/order_success.html", {
+    "service_request": service_request
+})
+            
+            
+            
+            
+                 
     else:
         form = ServiceRequestForm()
 
