@@ -1,8 +1,11 @@
 <h2>✅ Order Submitted Successfully</h2>
 
-<p>Your order has been placed.</p>
+<p>Your order has been placed successfully.</p>
 
 <p><strong>Tracking ID:</strong> {{ service_request.tracking_id }}</p>
 <p><strong>Price:</strong> ₦{{ service_request.price }}</p>
+<p><strong>Distance:</strong> {{ service_request.distance_km }} km</p>
 
-<a href="{% url 'dashboard' %}">Go to Dashboard</a>
+<br>
+
+<a href="{% url 'dashboard' %}">📊 Go to Dashboard</a>
