@@ -11,7 +11,7 @@
 
 <h3 class="mb-3 text-center">{{ service_type|title }} Request</h3>
 
-<form method="POST">
+<form method="POST" id="requestForm">
 {% csrf_token %}
 
 <div class="mb-3">
@@ -49,31 +49,44 @@
 {{ form.weight }}
 </div>
 
+<!-- DISPLAY ONLY -->
 <div class="mb-3">
 <label>Distance (km)</label>
-<input type="text" id="distance" class="form-control" readonly>
+<input type="text" id="distance_display" class="form-control" readonly>
 </div>
 
 <div class="mb-3">
 <label>Price (₦)</label>
-<input type="text" id="price" class="form-control" readonly>
+<input type="text" id="price_display" class="form-control" readonly>
 </div>
 
-<button type="button" class="btn btn-info w-100 mb-2" id="calculate-btn">Calculate Price</button>
-<button type="submit" class="btn btn-primary w-100">Submit Request</button>
+<!-- ✅ HIDDEN VALUES SENT TO DJANGO -->
+<input type="hidden" name="distance" id="distance">
+<input type="hidden" name="price" id="price">
+
+<button type="button" class="btn btn-info w-100 mb-2" id="calculate-btn">
+    Calculate Price
+</button>
+
+<button type="submit" class="btn btn-primary w-100">
+    Submit Request
+</button>
 
 </form>
+
 <a href="/" class="btn btn-secondary w-100 mt-3">Back Home</a>
 
 </div>
 </div>
 
 <script>
+let calculated = false;
+
 document.getElementById("calculate-btn").addEventListener("click", function(){
 
     let pickup = document.getElementById("id_pickup_location").value;
     let destination = document.getElementById("id_destination").value;
-    let weight = document.getElementById("id_weight").value || 0; // default 0 if empty
+    let weight = document.getElementById("id_weight").value || 0;
     let serviceType = "{{ service_type }}";
 
     if(pickup === "" || destination === "") {
@@ -90,8 +103,15 @@ document.getElementById("calculate-btn").addEventListener("click", function(){
         if(data.error) {
             alert(data.error);
         } else {
-            document.getElementById("distance").value = data.distance.toFixed(2) + " km";
-            document.getElementById("price").value = "₦ " + data.price.toFixed(2);
+            // DISPLAY
+            document.getElementById("distance_display").value = data.distance.toFixed(2) + " km";
+            document.getElementById("price_display").value = "₦ " + data.price.toFixed(2);
+
+            // SEND TO BACKEND
+            document.getElementById("distance").value = data.distance;
+            document.getElementById("price").value = data.price;
+
+            calculated = true;
         }
     })
     .catch(error => {
@@ -99,6 +119,15 @@ document.getElementById("calculate-btn").addEventListener("click", function(){
         alert("Error calculating price");
     });
 
+});
+
+
+// 🚨 PREVENT SUBMIT WITHOUT CALCULATING
+document.getElementById("requestForm").addEventListener("submit", function(e){
+    if(!calculated){
+        e.preventDefault();
+        alert("Please calculate price first before submitting.");
+    }
 });
 </script>
 

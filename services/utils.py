@@ -41,15 +41,8 @@ def geocode_address(address):
     return None
 
 
-# 🔹 FAST DISTANCE FUNCTION
 def calculate_distance(pickup, destination):
     try:
-        # 🔥 TEMP FIX (FAST RESPONSE)
-        # Comment this later when upgrading API
-        return 5
-
-        # 👇 ADVANCED VERSION (DISABLED FOR SPEED)
-        """
         pickup_coords = geocode_address(pickup)
         destination_coords = geocode_address(destination)
 
@@ -75,22 +68,16 @@ def calculate_distance(pickup, destination):
         )
 
         if response.status_code != 200:
-            print("ORS ERROR:", response.text)
             return 0
 
         data = response.json()
 
-        distance_meters = data["routes"][0]["summary"]["distance"]
-        distance_km = distance_meters / 1000
-
-        print("✅ Distance:", distance_km)
-
-        return distance_km
-        """
+        return data["routes"][0]["summary"]["distance"] / 1000
 
     except Exception as e:
         print("Distance error:", e)
-        return 5  # fallback
+        return 0
+
 
 
 # 🔹 PRICE FUNCTION (STABLE)
