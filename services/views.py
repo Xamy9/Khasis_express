@@ -1,11 +1,16 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from .forms import ServiceRequestForm, BusinessImageForm, ContactForm
 from .models import ServiceRequest, BusinessImage, LandingPage
 from notifications.models import Notification
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
-from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
+from django.contrib import messages
+from .utils import calculate_distance,calculate_price
+
 
 # ------------------------------
 # Pages
@@ -138,13 +143,33 @@ def create_request(request, service_type):
     return render(request, "services/create_request.html", {"form": form, "service_type": service_type})
 
 
-# ------------------------------
-# Preview price (frontend calculates)
-# ------------------------------
-
 def preview_price(request):
-    # Backend no longer calculates; return safe JSON
+    pickup = request.GET.get("pickup")
+    destination = request.GET.get("destination")
+    service_type = request.GET.get("service_type")
+    weight = request.GET.get("weight", 0)
+
+    if not pickup or not destination or not service_type:
+        return JsonResponse({"error": "Missing data"})
+
+    try:
+        weight = float(weight)
+    except:
+        weight = 0
+
+    try:
+        distance = calculate_distance(pickup, destination) or 0
+    except Exception as e:
+        print("Distance error:", e)
+        distance = 0
+
+    try:
+        price = calculate_price(service_type.lower(), distance, weight)
+    except Exception as e:
+        print("Price error:", e)
+        price = 0
+
     return JsonResponse({
-        "distance": 0,
-        "price": 0
+        "distance": round(distance, 2),
+        "price": round(price, 2)
     })
