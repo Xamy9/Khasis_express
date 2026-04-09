@@ -1,7 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from .forms import ServiceRequestForm, BusinessImageForm, ContactForm
 from .models import ServiceRequest, BusinessImage, LandingPage
-from .utils import calculate_price, calculate_distance
 from notifications.models import Notification
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
@@ -9,6 +8,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
+from django.contrib import messages
 
 
 def about(request):
@@ -20,7 +20,6 @@ def home(request):
     images = BusinessImage.objects.all()
     return render(request, "services/home.html", {"images": images})
 
-
 @login_required
 def create_request(request, service_type):
     if request.method == "POST":
@@ -31,100 +30,63 @@ def create_request(request, service_type):
             service_request.user = request.user
             service_request.service_type = service_type
 
-            # GET WEIGHT
+            # Get weight
             weight = service_request.weight or 0
 
-            # CALCULATE DISTANCE
+            # Get distance & price from frontend
+            distance = request.POST.get("distance", 0)
+            price = request.POST.get("price", 0)
+
             try:
-                distance = calculate_distance(
-                    service_request.pickup_location,
-                    service_request.destination
-                )
-                if distance is None:
-                    distance = 0
-            except Exception as e:
-                print("Distance calculation error:", e)
+                distance = float(distance)
+            except (TypeError, ValueError):
                 distance = 0
 
+            try:
+                price = float(price)
+            except (TypeError, ValueError):
+                price = 0
+
             service_request.distance_km = distance
+            service_request.price = price
 
-            # CALCULATE PRICE
-            try:
-                service_request.price = calculate_price(
-                    service_type,
-                    distance,
-                    weight
-                )
-            except Exception as e:
-                print("Price calculation error:", e)
-                service_request.price = 0
+            # Save order (fast)
+            service_request.save()
 
-            # SAVE ORDER
-            try:
-                service_request.save()
-            except Exception as e:
-                print("Save error:", e)
-                return render(request, "services/create_request.html", {
-                    "form": form,
-                    "service_type": service_type,
-                    "error": "Failed to save request"
-                })
+            # Send admin notification in background thread
+            import threading
+            def notify_admin():
+                try:
+                    admin_user = User.objects.filter(is_superuser=True).first()
+                    if admin_user:
+                        Notification.objects.create(
+                            user=admin_user,
+                            message=f"🚚 New {service_type} order from {request.user.username} ({service_request.tracking_id})"
+                        )
+                except Exception as e:
+                    print("Notification error:", e)
 
-            # SEND EMAIL (SAFE)
-            try:
-                if getattr(settings, "ADMIN_EMAIL", None):
-                    send_mail(
-                        subject="New Delivery Request - KHASIS EXPRESS",
-                        message=f"""
-A new {service_type} request has been placed.
+            threading.Thread(target=notify_admin).start()
 
-Customer: {request.user.username}
-Sender Phone: {service_request.sender_phone_number}
-Receiver: {service_request.receiver_name}
-Receiver Phone: {service_request.receiver_phone_number}
+            # Success message
+            messages.success(request, "Order submitted successfully!")
 
-Package: {service_request.package_description}
-Weight: {service_request.weight} kg
-
-Distance: {service_request.distance_km} km
-Price: {service_request.price}
-
-Tracking ID: {service_request.tracking_id}
-                        """,
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[settings.ADMIN_EMAIL],
-                        fail_silently=True,
-                    )
-            except Exception as e:
-                print("Email error:", e)
-
-            # ADMIN NOTIFICATION (SAFE)
-            try:
-                admin_user = User.objects.filter(is_superuser=True).first()
-                if admin_user:
-                    Notification.objects.create(
-                        user=admin_user,
-                        message=f"{service_type} request from {request.user.username} ({service_request.tracking_id})"
-                    )
-            except Exception as e:
-                print("Notification error:", e)
-
+            # Return success page immediately
             return render(request, "services/order_success.html", {
-    "service_request": service_request
-})
-            
-            
-            
-            
-                 
+                "service_request": service_request
+            })
+
+        else:
+            print("Form errors:", form.errors)
+
     else:
         form = ServiceRequestForm()
 
-    return render(
-        request,
-        "services/create_request.html",
-        {"form": form, "service_type": service_type}
-    )
+    return render(request, "services/create_request.html", {
+        "form": form,
+        "service_type": service_type
+    })
+
 
 
 @login_required
@@ -142,35 +104,10 @@ def track_order(request):
     return render(request, "services/track_order.html", {"order": order})
 
 
+# ⚠️ OPTIONAL: KEEP ONLY IF YOU STILL WANT BACKEND PREVIEW
 def preview_price(request):
-    pickup = request.GET.get("pickup")
-    destination = request.GET.get("destination")
-    service_type = request.GET.get("service_type")
-    weight = request.GET.get("weight", 0)
-
-    if not pickup or not destination or not service_type:
-        return JsonResponse({"error": "Missing data"})
-
-    service_type = service_type.strip().lower()
-
-    try:
-        weight = float(weight)
-    except (ValueError, TypeError):
-        weight = 0
-
-    try:
-        distance = calculate_distance(pickup, destination)
-        if distance is None:
-            distance = 0
-    except Exception as e:
-        print("Preview distance error:", e)
-        distance = 0
-
-    price = calculate_price(service_type, distance, weight)
-
     return JsonResponse({
-        "distance": round(distance, 2),
-        "price": round(price, 2)
+        "message": "Move calculation to frontend for speed"
     })
 
 
